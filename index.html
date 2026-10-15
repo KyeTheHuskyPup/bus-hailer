@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#ffd200">
+  <link rel="manifest" href="manifest.json">
+  <title>Bus Hailer</title>
+  <style>
+    :root { --bg-color: #ffd200; --text-color: #000000; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100vw; height: 100dvh;
+      background-color: var(--bg-color); color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Google Sans", "Segoe UI", Roboto, sans-serif;
+      overflow: hidden; display: flex; flex-direction: column; touch-action: manipulation;
+    }
+    #display-area {
+      flex: 1; width: 100%; height: 100%;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      text-align: center; padding: env(safe-area-inset-top, 8px) env(safe-area-inset-right, 8px) 4px env(safe-area-inset-left, 8px);
+      cursor: pointer; overflow: hidden;
+    }
+    #bus-wrapper {
+      width: 100%; flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden;
+    }
+    #bus-number {
+      font-weight: 950; line-height: 0.8; letter-spacing: -2px; white-space: nowrap; text-transform: uppercase; display: inline-block;
+    }
+    #sub-label {
+      font-size: clamp(20px, 5.5vw, 42px); font-weight: 900; text-transform: uppercase; letter-spacing: 4px; padding-bottom: 8px; flex-shrink: 0;
+    }
+    .controls {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #000000; z-index: 100;
+    }
+    body.hail-mode .controls { display: none; }
+    button {
+      width: 100%; min-height: 56px; padding: 12px 6px; font-size: 1.2rem; font-weight: bold;
+      border: 3px solid #ffffff; border-radius: 10px; cursor: pointer; background-color: #ffffff; color: #000000;
+      touch-action: manipulation; display: flex; align-items: center; justify-content: center;
+    }
+    button:focus, button:hover { background-color: #ffd200; outline: 4px solid #ffffff; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+  </style>
+</head>
+<body>
+  <div id="announcer" class="sr-only" aria-live="assertive"></div>
+  <main id="display-area" aria-label="Bus hailer. Tap anywhere to toggle controls." onclick="toggleControls()">
+    <div id="bus-wrapper"><div id="bus-number">20</div></div>
+    <div id="sub-label">PLEASE STOP</div>
+  </main>
+  <nav class="controls" id="controls-bar" aria-label="Hailer controls">
+    <button id="set-btn" onclick="setBusNumber()" aria-label="Set bus number">Set Bus</button>
+    <button id="fullscreen-btn" onclick="toggleFullscreen()" aria-label="Toggle Full Screen">Full Screen</button>
+    <button id="toggle-color-btn" onclick="toggleContrast()" aria-label="Invert colors">Invert Colors</button>
+    <button id="flash-btn" onclick="toggleFlash()" aria-label="Signal driver">Signal Driver</button>
+  </nav>
+  <script>
+    let flashInterval = null;
+    let isHighContrastWhite = false;
+    const busNumberEl = document.getElementById('bus-number');
+    const busWrapperEl = document.getElementById('bus-wrapper');
+    function fitText() {
+      const containerW = busWrapperEl.clientWidth - 20;
+      const containerH = busWrapperEl.clientHeight - 10;
+      if (containerW <= 0 || containerH <= 0) return;
+      let min = 20, max = 650, optimal = min;
+      while (min <= max) {
+        const mid = Math.floor((min + max) / 2);
+        busNumberEl.style.fontSize = mid + 'px';
+        if (busNumberEl.scrollWidth <= containerW && busNumberEl.scrollHeight <= containerH) {
+          optimal = mid; min = mid + 1;
+        } else { max = mid - 1; }
+      }
+      busNumberEl.style.fontSize = optimal + 'px';
+    }
+    window.addEventListener('resize', () => requestAnimationFrame(fitText));
+    if (screen.orientation) { screen.orientation.addEventListener('change', () => setTimeout(fitText, 100)); }
+    function vibrate(p = 50) { if ('vibrate' in navigator) navigator.vibrate(p); }
+    function announce(text) {
+      const a = document.getElementById('announcer'); a.innerText = '';
+      setTimeout(() => { a.innerText = text; }, 50);
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; window.speechSynthesis.speak(u);
+      }
+    }
+    function setBusNumber() {
+      vibrate(40);
+      const cur = busNumberEl.innerText;
+      const bus = prompt('Enter bus route (e.g. 20, X21, Q3):', cur === '---' ? '' : cur);
+      if (bus && bus.trim() !== '') {
+        const cl = bus.trim().toUpperCase();
+        busNumberEl.innerText = cl; fitText();
+        announce(`Bus route set to ${cl.split('').join(' ')}. Displaying bus ${cl} please stop.`);
+        vibrate([50, 50, 50]);
+      }
+    }
+    function toggleControls() {
+      vibrate(30);
+      const isHidden = document.body.classList.toggle('hail-mode');
+      setTimeout(fitText, 60);
+      announce(isHidden ? 'Controls hidden. Tap screen to show buttons.' : 'Controls visible.');
+    }
+    function toggleContrast() {
+      vibrate(40);
+      const b = document.body;
+      if (!isHighContrastWhite) {
+        b.style.setProperty('--bg-color', '#ffffff'); b.style.setProperty('--text-color', '#000000');
+        announce('Background white.'); isHighContrastWhite = true;
+      } else {
+        b.style.setProperty('--bg-color', '#ffd200'); b.style.setProperty('--text-color', '#000000');
+        announce('Background yellow.'); isHighContrastWhite = false;
+      }
+    }
+    function toggleFlash() {
+      const btn = document.getElementById('flash-btn');
+      if (flashInterval) {
+        clearInterval(flashInterval); flashInterval = null;
+        document.body.style.opacity = '1'; btn.innerText = 'Signal Driver';
+        announce('Flashing signal stopped.'); vibrate(80);
+      } else {
+        announce('Flashing signal started.'); vibrate([100, 50, 100]);
+        let visible = true;
+        flashInterval = setInterval(() => {
+          visible = !visible; document.body.style.opacity = visible ? '1' : '0.15';
+        }, 300);
+        btn.innerText = 'Stop Signal';
+      }
+    }
+    function toggleFullscreen() {
+      vibrate(50);
+      const doc = document.documentElement;
+      const btn = document.getElementById('fullscreen-btn');
+      if (!document.fullscreenElement) {
+        doc.requestFullscreen().catch(() => {});
+        btn.innerText = 'Exit Full'; document.body.classList.add('hail-mode');
+        setTimeout(fitText, 200); announce('Full screen active.');
+      } else {
+        document.exitFullscreen().catch(() => {});
+        btn.innerText = 'Full Screen'; document.body.classList.remove('hail-mode');
+        setTimeout(fitText, 200); announce('Exited full screen.');
+      }
+    }
+    async function requestWakeLock() {
+      try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (err) {}
+    }
+    window.addEventListener('load', () => {
+      requestWakeLock(); fitText();
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { requestWakeLock(); fitText(); }
+    });
+  </script>
+</body>
+</html>
