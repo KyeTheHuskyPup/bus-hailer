@@ -1,10 +1,9 @@
 {
-  "id": "/bus-hailer/",
   "name": "Bus Hailer",
   "short_name": "Hailer",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#ffd200",
   "theme_color": "#ffd200",
   "orientation": "any",
